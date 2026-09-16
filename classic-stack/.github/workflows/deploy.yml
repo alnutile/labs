@@ -1,0 +1,44 @@
+name: Deploy classic-stack application
+
+on:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+
+concurrency:
+  group: classic-stack-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build application artifact
+        run: |
+          npm ci
+          npm run build
+          tar -czf release.tar.gz dist package.json package-lock.json
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.CLASSIC_STACK_DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.CLASSIC_STACK_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+
+      - name: Upload and activate atomic release
+        env:
+          DEPLOY_HOST: ${{ secrets.CLASSIC_STACK_HOST }}
+          DEPLOY_USER: deploy
+          RELEASE_ID: ${{ github.run_id }}-${{ github.sha }}
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /home/deploy/apps/classic-stack/releases/$RELEASE_ID"
+          scp release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/home/deploy/apps/classic-stack/releases/$RELEASE_ID/"
+          scp deploy/remote-activate.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/classic-stack-activate-$RELEASE_ID"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "tar -xzf /home/deploy/apps/classic-stack/releases/$RELEASE_ID/release.tar.gz -C /home/deploy/apps/classic-stack/releases/$RELEASE_ID && rm /home/deploy/apps/classic-stack/releases/$RELEASE_ID/release.tar.gz && chmod +x /tmp/classic-stack-activate-$RELEASE_ID && /tmp/classic-stack-activate-$RELEASE_ID $RELEASE_ID"

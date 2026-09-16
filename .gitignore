@@ -1,0 +1,25 @@
+# Credentials and local environment values
+.env
+.env.*
+!.env.example
+
+# Terraform working files and state
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/.terraform.tfstate.lock.info
+**/*.tfplan
+**/tfplan
+
+# Local Terraform variable values
+**/*.tfvars
+**/*.tfvars.json
+
+# Terraform CLI credentials
+.terraformrc
+terraform.rc
+
+# Local machine files
+.DS_Store
+crash.log
+crash.*.log

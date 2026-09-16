@@ -1,0 +1,21 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - rsync
+
+users:
+  - name: ${app_user}
+    groups: [adm, docker]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable --now docker
+  - mkdir -p /home/${app_user}/apps/classic-stack/releases
+  - mkdir -p /home/${app_user}/apps/classic-stack/shared/{env,storage,postgres,logs,bin}
+  - chown -R ${app_user}:${app_user} /home/${app_user}/apps
