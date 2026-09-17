@@ -85,9 +85,13 @@ resource "aws_instance" "classic_stack" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnets.default.ids[0]
-  vpc_security_group_ids      = [aws_security_group.classic_stack.id]
+  vpc_security_group_ids      = concat([aws_security_group.classic_stack.id], aws_security_group.github_runner[*].id)
   associate_public_ip_address = true
-  user_data                   = templatefile("${path.module}/cloud-init.yaml", { app_user = var.app_user })
+  user_data = templatefile("${path.module}/cloud-init.yaml", {
+    app_user        = var.app_user
+    ssh_public_keys = var.ssh_public_keys
+  })
+  user_data_replace_on_change = true
 
   root_block_device {
     encrypted   = true

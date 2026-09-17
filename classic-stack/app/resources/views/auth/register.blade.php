@@ -1,0 +1,3 @@
+@extends('layouts.app')
+@section('content')<section class="auth"><p class="eyebrow">CLASSIC STACK LAB</p><h1>Make it yours.</h1><form method="POST" action="{{ route('register') }}">@csrf
+<label>Name<input name="name" value="{{ old('name') }}" autocomplete="name" required autofocus></label><label>Email<input type="email" name="email" value="{{ old('email') }}" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="new-password" minlength="8" required></label><label>Confirm password<input type="password" name="password_confirmation" autocomplete="new-password" required></label><button>Create account →</button></form><p><a href="{{ route('login') }}">Back to sign in</a></p></section>@endsection

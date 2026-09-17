@@ -5,17 +5,29 @@ packages:
   - curl
   - git
   - rsync
+  - python3
+  - util-linux
 
+groups:
+  - docker
 users:
+  - default
   - name: ${app_user}
     groups: [adm, docker]
     shell: /bin/bash
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     lock_passwd: true
+    ssh_authorized_keys: ${jsonencode(ssh_public_keys)}
+
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: '0644'
+    content: |
+      {"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}
 
 runcmd:
-  - curl -fsSL https://get.docker.com | sh
+  - [bash, -o, pipefail, -c, 'curl -fsSL https://get.docker.com | sh']
   - systemctl enable --now docker
-  - mkdir -p /home/${app_user}/apps/classic-stack/releases
-  - mkdir -p /home/${app_user}/apps/classic-stack/shared/{env,storage,postgres,logs,bin}
+  - mkdir -p /home/${app_user}/apps/classic-stack/releases /home/${app_user}/apps/classic-stack/shared/env /home/${app_user}/apps/classic-stack/shared/proxy
   - chown -R ${app_user}:${app_user} /home/${app_user}/apps
+  - chmod 700 /home/${app_user}/apps/classic-stack/shared/env

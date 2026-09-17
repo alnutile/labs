@@ -23,7 +23,7 @@ variable "root_volume_size_gb" {
 }
 
 variable "app_user" {
-  description = "Unprivileged user that owns application releases and data."
+  description = "Deployment user with Docker and sudo access; treat its SSH key as root-equivalent."
   type        = string
   default     = "deploy"
 }
@@ -32,4 +32,25 @@ variable "admin_cidr_blocks" {
   description = "CIDR blocks allowed to SSH. Set this explicitly before applying."
   type        = list(string)
   default     = []
+}
+
+variable "ssh_public_keys" {
+  description = "Public SSH keys installed for the deploy user by cloud-init. Never put private keys here."
+  type        = list(string)
+  validation {
+    condition     = length(var.ssh_public_keys) > 0 && alltrue([for key in var.ssh_public_keys : can(regex("^ssh-(ed25519|rsa) ", key))])
+    error_message = "Supply at least one ssh-ed25519 or ssh-rsa public key."
+  }
+}
+
+variable "github_oidc_subject" {
+  description = "Exact GitHub OIDC sub for the production environment. Empty disables Actions access. New repos may include immutable owner/repo IDs; see README."
+  type        = string
+  default     = ""
+}
+
+variable "github_oidc_provider_arn" {
+  description = "Existing account-wide GitHub OIDC provider ARN, or empty to create one when Actions is enabled."
+  type        = string
+  default     = ""
 }

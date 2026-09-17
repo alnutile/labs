@@ -1,0 +1,46 @@
+name: classic-stack
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?}
+      POSTGRES_USER: ${DB_USERNAME:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [stack]
+  redis:
+    image: redis:7.4-bookworm
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [stack]
+  proxy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ${APP_ROOT:?}/shared/proxy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [stack]
+networks:
+  stack:
+    name: classic-stack
+volumes:
+  postgres:
+  redis:
+  caddy_data:
+  caddy_config:

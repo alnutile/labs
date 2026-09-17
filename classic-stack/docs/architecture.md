@@ -1,60 +1,32 @@
-# classic-stack architecture
-
-## Video goal
-
-Show a predictable, understandable deployment for a small application: one AWS EC2 host, one public IP, one monthly infrastructure bill, and one GitHub Actions workflow that can deploy staging or production.
-
-This stack intentionally keeps Postgres and file storage on the host. That makes the data path visible and the cost easy to reason about. It also makes backups, disk growth, security updates, and recovery the operator's responsibility.
-
-## Request path
+# Classic stack architecture
 
 ```text
-Browser
-  ↓ HTTPS
-Cloudflare DNS/proxy
-  ↓ 80/443
-Nginx or Caddy on the EC2 host
-  ├── current frontend release
-  ├── application API/WebSocket process
-  └── internal Docker services
-        ├── PostgreSQL (private bind)
-        ├── object/file storage (private bind)
-        └── worker/webhook services
+Browser → Cloudflare DNS (optional proxy) → Elastic IP
+    → default VPC / public subnet / web security group → EC2
+        → Caddy :80/:443 (automatic origin HTTPS)
+            → active Laravel/Apache container (no published port)
+                → PostgreSQL
+                → Redis → Horizon worker
+                → private report volume
+        → scheduler (Horizon metrics every five minutes)
 ```
 
-SSH is restricted to the operator's IP range. The application never needs a public database port. Cloudflare points to the Elastic IP; the origin firewall permits only web traffic and the approved administration path.
+PostgreSQL, Redis, and file data stay on this server. Named Docker volumes outlive releases but reside on the EC2 root disk. The proxy certificate volume persists too. None of the database, Redis, Caddy admin, or application-container ports are published publicly.
 
-## Release layout
+The deploy user's public keys are installed by cloud-init. Operator SSH ingress is restricted to configured CIDRs. An optional second security group allows a GitHub runner's temporary `/32`; the OIDC role is scoped to that security group and the repository's production environment subject.
 
-```text
-/home/deploy/apps/classic-stack/
-├── current -> releases/20260914T120000Z-abc1234
-├── releases/
-│   ├── 20260914T120000Z-abc1234/
-│   └── 20260913T180000Z-def5678/
-└── shared/
-    ├── env/production.env
-    ├── env/staging.env
-    ├── storage/
-    ├── postgres/
-    └── logs/
-```
+The default VPC/subnets/internet gateway already exist in AWS and are read by Terraform. The managed resources are EC2, its encrypted root volume, security groups, Elastic IP/association, and optional GitHub IAM/OIDC resources.
 
-The release is built before activation. Health checks and migrations run against the candidate. The final activation is a symlink replacement, which is atomic for readers. Rollback points `current` at the previous release. Persistent directories are never part of a release and are never deleted by cleanup.
+## Releases
 
-For a stateful application, this is near-zero-downtime rather than magic zero downtime: incompatible database migrations, process restarts, WebSocket reconnects, or a single-host failure still need an explicit strategy. A true no-downtime exercise can add two application containers and switch the reverse proxy only after the new one is healthy.
+Each release is an immutable Docker image tagged with the workflow run ID and commit SHA. A release-specific Compose project gives its app a unique DNS alias on the shared Docker network. Persistent services use a separate stable Compose project.
 
-## Why not begin with a VM image or Kubernetes?
+Migrations run before activation. The candidate health endpoint checks PostgreSQL and Redis. Old consumers stop gracefully, new Horizon/scheduler processes start, and Caddy validates then reloads its new upstream configuration. The previous web process drains before stopping. On activation failure, the script restores the previous proxy configuration and workers; database migrations remain applied.
 
-The EC2 host makes the operating system, firewall, storage, process supervision, and deployment mechanics visible. Managed containers and databases belong in `cloud-stack` once the application contract is stable. Kubernetes would add a platform lesson before the application deployment lesson.
+`current` and `previous` symlinks record release locations. Rollback reruns activation for a retained release/image. It cannot be accomplished by just changing a symlink.
 
-## Required safety controls
+## Failure boundary
 
-- Encrypted EBS volume and automatic snapshots or an off-host backup target.
-- No AWS keys on the instance; use an instance role for AWS APIs.
-- No database or storage ports in the security group.
-- Separate staging and production environment files and domains.
-- GitHub Actions deploy key limited to this host and repository.
-- Pin action versions and verify the host key with `known_hosts`.
-- Keep at least two releases and test rollback during the video.
+One server means one failure domain. This design provides a controlled deployment transition, not high availability. Database/schema changes must support overlapping app versions. Host failure/reboot, exhausted disk, broken infrastructure updates, and lost volumes require recovery. Backups must leave the host and have a tested restore procedure.
 
+The complete runbook and recording commands are in [the stack README](../README.md).

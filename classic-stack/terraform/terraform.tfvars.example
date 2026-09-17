@@ -3,3 +3,9 @@ instance_type       = "t3.small"
 root_volume_size_gb = 30
 app_user            = "deploy"
 admin_cidr_blocks   = ["203.0.113.10/32"]
+
+ssh_public_keys = ["ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY classic-stack-deploy"]
+# Enable after verifying your repository's exact OIDC subject format:
+# github_oidc_subject = "repo:alnutile@365385/labs@1370401167:environment:production"
+# If an account-wide GitHub OIDC provider already exists, reuse its ARN:
+# github_oidc_provider_arn = "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"

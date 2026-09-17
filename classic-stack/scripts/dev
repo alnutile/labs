@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+if [[ ! -f app/.env ]]; then cp app/.env.example app/.env; fi
+compose() { docker compose --env-file app/.env "$@"; }
+case "${1:-up}" in
+  up)
+    compose build app
+    compose up -d --wait postgres redis
+    compose run --rm --no-deps app composer install --no-interaction
+    if ! grep -q '^APP_KEY=base64:' app/.env; then compose run --rm --no-deps app php artisan key:generate; fi
+    compose run --rm --no-deps app sh -c 'chmod -R a+rwX storage bootstrap/cache'
+    compose run --rm --no-deps app php artisan migrate --force
+    compose up -d app horizon scheduler
+    echo 'Stack ready. Open APP_URL from app/.env and register; Horizon is at /horizon.'
+    ;;
+  smoke) compose exec -T -e STACK_APP_PATH=/var/www/html app php < scripts/queue-smoke.php ;;
+  test) shift; compose exec -T -e APP_ENV=testing -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: -e SESSION_DRIVER=array -e CACHE_STORE=array -e QUEUE_CONNECTION=sync app php artisan test "$@" ;;
+  artisan) shift; compose exec app php artisan "$@" ;;
+  *) compose "$@" ;;
+esac

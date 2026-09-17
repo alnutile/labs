@@ -1,0 +1,56 @@
+name: classic-stack-local
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    target: development
+  image: classic-stack-dev
+  env_file: app/.env
+  volumes:
+    - ./app:/var/www/html
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+services:
+  app:
+    <<: *app
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:80"
+  horizon:
+    <<: *app
+    command: php artisan horizon
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+  scheduler:
+    <<: *app
+    command: php artisan schedule:work
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-classic_stack}
+      POSTGRES_USER: ${DB_USERNAME:-classic_stack}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-local-only-change-me}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4-bookworm
+    command: redis-server --appendonly yes
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres:
+  redis:

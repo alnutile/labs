@@ -10,3 +10,10 @@ output "instance_id" {
 output "ssh_command" {
   value = "ssh ${var.app_user}@${aws_eip.classic_stack.public_ip}"
 }
+
+output "github_deploy_role_arn" {
+  value = try(aws_iam_role.github_deploy[0].arn, null)
+}
+output "github_runner_security_group_id" {
+  value = try(aws_security_group.github_runner[0].id, null)
+}

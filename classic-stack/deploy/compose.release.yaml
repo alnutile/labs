@@ -1,0 +1,44 @@
+x-app: &app
+  image: classic-stack:${RELEASE_ID:?}
+  restart: unless-stopped
+  env_file: ${APP_ROOT:?}/shared/env/production.env
+  volumes:
+    - storage:/var/www/html/storage/app
+  networks: [stack]
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+services:
+  app:
+    <<: *app
+    networks:
+      stack:
+        aliases: ["app-${RELEASE_ID:?}"]
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost/ready]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+  horizon:
+    <<: *app
+    user: www-data
+    command: php artisan horizon
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+  scheduler:
+    <<: *app
+    user: www-data
+    command: php artisan schedule:work
+    stop_signal: SIGTERM
+    stop_grace_period: 60s
+networks:
+  stack:
+    external: true
+    name: classic-stack
+volumes:
+  storage:
+    external: true
+    name: classic-stack-storage
