@@ -54,3 +54,28 @@ variable "github_oidc_provider_arn" {
   type        = string
   default     = ""
 }
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token with Zone/DNS/Edit for the zone. Prefer TF_VAR_cloudflare_api_token or CLOUDFLARE_API_TOKEN; never commit it."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "cloudflare_zone_name" {
+  description = "Cloudflare zone that owns the stack hostname."
+  type        = string
+  default     = "dailyai.studio"
+}
+
+variable "cloudflare_record_name" {
+  description = "A-record name relative to the Cloudflare zone."
+  type        = string
+  default     = "classic-stack"
+}
+
+variable "cloudflare_record_proxied" {
+  description = "Whether Cloudflare proxies the origin. Keep false until origin HTTPS is working."
+  type        = bool
+  default     = false
+}

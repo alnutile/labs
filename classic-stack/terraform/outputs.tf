@@ -17,3 +17,7 @@ output "github_deploy_role_arn" {
 output "github_runner_security_group_id" {
   value = try(aws_security_group.github_runner[0].id, null)
 }
+
+output "cloudflare_hostname" {
+  value = "${var.cloudflare_record_name}.${var.cloudflare_zone_name}"
+}

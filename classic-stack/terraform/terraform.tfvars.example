@@ -9,3 +9,10 @@ ssh_public_keys = ["ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY classic-stack-deplo
 # github_oidc_subject = "repo:alnutile@365385/labs@1370401167:environment:production"
 # If an account-wide GitHub OIDC provider already exists, reuse its ARN:
 # github_oidc_provider_arn = "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+
+# Optional until Cloudflare DNS is ready. Set CLOUDFLARE_API_TOKEN or this value
+# through a secret manager; do not commit a token to terraform.tfvars.
+# cloudflare_api_token   = ""
+cloudflare_zone_name     = "dailyai.studio"
+cloudflare_record_name   = "classic-stack"
+cloudflare_record_proxied = false

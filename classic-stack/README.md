@@ -93,22 +93,36 @@ docker compose version
 
 Docker-group access and the deploy user's sudo access are effectively root access. Protect that SSH key accordingly. Cloud-init installs Docker from Docker's installer; the host still needs regular security updates and planned reboots.
 
-## 3. Point Cloudflare at the Elastic IP
+## 3. Point Cloudflare at the Elastic IP with Terraform
 
-Use **classic-stack.dailyai.studio**, an A record pointing to `terraform output -raw elastic_ip`. Begin **DNS only**. Caddy will obtain and renew an HTTPS certificate once this hostname resolves to the host and ports 80/443 are reachable.
+The DNS record is part of the same reviewed plan as the server. Terraform manages an A record for **classic-stack.dailyai.studio**, pointing at the Elastic IP. Begin **DNS only** so Caddy can obtain and renew its origin certificate while the stack is coming online.
 
-The optional helper needs a token scoped to **Zone / DNS / Edit** on **dailyai.studio** and the zone ID from Cloudflare. Set the token using a hidden shell prompt, not a literal command saved in shell history:
+Create a Cloudflare API token scoped to **Zone / DNS / Edit** on **dailyai.studio**. Keep it outside the repository and pass it through the environment:
 
 ```bash
 # From classic-stack; the value stays hidden while typing:
 printf 'Cloudflare token: '; read -rs CLOUDFLARE_API_TOKEN; echo
-export CLOUDFLARE_API_TOKEN
-export CLOUDFLARE_ZONE_ID=YOUR_ZONE_ID
-./scripts/cloudflare-dns "$(terraform -chdir=terraform output -raw elastic_ip)"
-unset CLOUDFLARE_API_TOKEN
+export TF_VAR_cloudflare_api_token="$CLOUDFLARE_API_TOKEN"
+terraform -chdir=terraform plan -out classic-stack-with-dns.tfplan
+terraform -chdir=terraform apply classic-stack-with-dns.tfplan
+unset TF_VAR_cloudflare_api_token CLOUDFLARE_API_TOKEN
 ```
 
-The helper only creates/updates this hostname's A record. It refuses conflicting records and preserves an existing proxy setting. After the first deployment and a successful `https://classic-stack.dailyai.studio/ready` check, Cloudflare proxying is optional. Use **Full (strict)** SSL/TLS when proxying; do not use Flexible. TLS settings may affect other domains in the zone, so review their scope. The public origin is still reachable directly: this is not a Cloudflare-only firewall configuration or private network.
+The module discovers the zone by name and creates `cloudflare_record.classic_stack`. If the record was created manually first, import it into state before applying the plan:
+
+```bash
+ZONE_ID=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/zones?name=dailyai.studio" \
+  | jq -r '.result[0].id')
+RECORD_ID=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=A&name=classic-stack.dailyai.studio" \
+  | jq -r '.result[0].id')
+terraform -chdir=terraform import \
+  'cloudflare_record.classic_stack[0]' \
+  "$ZONE_ID/$RECORD_ID"
+```
+
+After the first deployment and a successful `https://classic-stack.dailyai.studio/ready` check, Cloudflare proxying is optional. Set `cloudflare_record_proxied = true` only after the origin is serving HTTPS, and use **Full (strict)** SSL/TLS when proxying. The public origin remains reachable directly unless the AWS security group is restricted separately.
 
 ## 4. Prepare production configuration
 
