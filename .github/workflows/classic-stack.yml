@@ -1,0 +1,142 @@
+name: Classic stack — test and deploy
+on:
+  pull_request:
+    paths: ['classic-stack/**', '.github/workflows/classic-stack.yml']
+  push:
+    branches: [main]
+    paths: ['classic-stack/**', '.github/workflows/classic-stack.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  RELEASE_ID: ${{ github.run_id }}-${{ github.sha }}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: classic-stack/app
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: classic_stack_test
+          POSTGRES_USER: classic_stack
+          POSTGRES_PASSWORD: testing-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U classic_stack -d classic_stack_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7.4-bookworm
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: classic_stack_test
+      DB_USERNAME: classic_stack
+      DB_PASSWORD: testing-only
+      REDIS_HOST: 127.0.0.1
+      REDIS_CLIENT: predis
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pcntl, bcmath
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: vendor/bin/pint --test
+      - run: php artisan test
+      - name: Run a real job through Redis and Horizon
+        run: |
+          php artisan migrate --force
+          php artisan horizon > /tmp/horizon.log 2>&1 &
+          horizon_pid=$!
+          trap 'kill "$horizon_pid" 2>/dev/null || true' EXIT
+          php ../scripts/queue-smoke.php
+      - name: Build the deployable image
+        working-directory: classic-stack
+        run: docker build --target production -f docker/Dockerfile -t "classic-stack:$RELEASE_ID" .
+      - name: Package the tested release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.CLASSIC_STACK_DEPLOY_ENABLED == 'true'
+        working-directory: classic-stack
+        run: |
+          docker save "classic-stack:$RELEASE_ID" | gzip > image.tar.gz
+          tar -czf release.tar.gz image.tar.gz deploy
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.CLASSIC_STACK_DEPLOY_ENABLED == 'true'
+        with:
+          name: classic-stack-release
+          path: classic-stack/release.tar.gz
+          retention-days: 2
+          overwrite: true
+          compression-level: 0
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.CLASSIC_STACK_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    concurrency:
+      group: classic-stack-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOY_HOST: ${{ secrets.CLASSIC_STACK_HOST }}
+      DEPLOY_USER: ${{ vars.CLASSIC_STACK_DEPLOY_USER || 'deploy' }}
+      SECURITY_GROUP_ID: ${{ vars.CLASSIC_STACK_RUNNER_SECURITY_GROUP_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: classic-stack-release
+          path: classic-stack
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+        with:
+          role-to-assume: ${{ vars.CLASSIC_STACK_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      - name: Allow SSH from this runner only
+        id: firewall
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_ip="$(curl -4fsS --retry 3 https://checkip.amazonaws.com | tr -d '\n')"
+          python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$runner_ip"
+          echo "cidr=$runner_ip/32" >> "$GITHUB_OUTPUT"
+          aws ec2 authorize-security-group-ingress --group-id "$SECURITY_GROUP_ID" --protocol tcp --port 22 --cidr "$runner_ip/32"
+      - name: Configure SSH with a pinned host key
+        env:
+          DEPLOY_KEY: ${{ secrets.CLASSIC_STACK_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.CLASSIC_STACK_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf 'Host *\n  BatchMode yes\n  StrictHostKeyChecking yes\n  ConnectTimeout 15\n' > "$HOME/.ssh/config"
+      - name: Upload and activate
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          app_root="/home/$DEPLOY_USER/apps/classic-stack"
+          for _attempt in {1..10}; do
+            if ssh "$DEPLOY_USER@$DEPLOY_HOST" true; then break; fi
+            sleep 3
+          done
+          # shellcheck disable=SC2029 # Validated paths intentionally expand on the runner.
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$app_root/releases/$RELEASE_ID'"
+          scp classic-stack/release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:$app_root/releases/$RELEASE_ID/release.tar.gz"
+          # shellcheck disable=SC2029 # Validated paths intentionally expand on the runner.
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$app_root/releases/$RELEASE_ID' && tar -xzf release.tar.gz && rm release.tar.gz && APP_ROOT='$app_root' bash deploy/remote-activate.sh '$RELEASE_ID'"
+      - name: Remove temporary SSH access
+        if: always() && steps.firewall.outputs.cidr != ''
+        env:
+          RUNNER_CIDR: ${{ steps.firewall.outputs.cidr }}
+        run: aws ec2 revoke-security-group-ingress --group-id "$SECURITY_GROUP_ID" --protocol tcp --port 22 --cidr "$RUNNER_CIDR"

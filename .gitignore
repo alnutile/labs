@@ -23,3 +23,11 @@ terraform.rc
 .DS_Store
 crash.log
 crash.*.log
+
+# Local release/backup artifacts
+classic-stack/image.tar.gz
+classic-stack/release.tar.gz
+classic-stack/backups/
+classic-stack/deploy/production.env
+
+__pycache__/
