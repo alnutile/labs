@@ -222,6 +222,16 @@ return [
         ],
 
         'local' => [
+            'supervisor-agent' => [
+                'connection' => 'agent',
+                'queue' => ['agents'],
+                'balance' => false,
+                'maxProcesses' => 1,
+                'minProcesses' => 1,
+                'memory' => 256,
+                'tries' => 1,
+                'timeout' => 850,
+            ],
             'supervisor-1' => [
                 'maxProcesses' => 3,
             ],

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+test -f app/.env || { echo 'Run ./scripts/dev up first.' >&2; exit 1; }
+compose() { docker compose --env-file app/.env -f compose.yaml -f compose.agent.yaml "$@"; }
+set_env() {
+  local key="$1" value="$2" temporary
+  if grep -q "^${key}=" app/.env; then
+    temporary="$(mktemp "${TMPDIR:-/tmp}/classic-stack-agent.XXXXXX")"
+    awk -v key="$key" -v value="$value" 'index($0, key "=") == 1 { $0 = key "=" value } { print }' app/.env > "$temporary"
+    mv "$temporary" app/.env
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> app/.env
+  fi
+}
+case "${1:-up}" in
+  up)
+    broker_token="$(sed -n 's/^AGENT_BROKER_TOKEN=//p' app/.env | tail -n 1)"
+    if (( ${#broker_token} < 32 )); then
+      set_env AGENT_BROKER_TOKEN "$(openssl rand -hex 32)"
+    fi
+    set_env AGENT_ENABLED true
+    compose build agent-image agent-broker agent-proxy
+    compose up -d agent-broker agent-proxy app
+    compose exec -T app php artisan config:clear
+    compose exec -T app php artisan migrate --force
+    compose up -d --force-recreate horizon
+    echo 'Open /agent on your local app. Set AGENT_ENABLED=true, AGENT_PROVIDER, AGENT_MODEL and OPENAI_API_KEY (or AGENT_API_KEY) in app/.env; rerun this command after changes.'
+    ;;
+  logs) compose logs -f --tail=100 agent-broker agent-proxy horizon ;;
+  *) compose "$@" ;;
+esac
