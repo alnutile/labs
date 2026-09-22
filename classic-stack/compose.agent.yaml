@@ -1,0 +1,34 @@
+# Local experiment only. The broker alone gets Docker access; task containers never do.
+services:
+  agent-broker:
+    build:
+      context: docker/agent
+      target: broker
+    environment:
+      AGENT_BROKER_TOKEN: ${AGENT_BROKER_TOKEN:?Set AGENT_BROKER_TOKEN in app/.env}
+      AGENT_SANDBOX_IMAGE: classic-stack-agent-sandbox
+      AGENT_SANDBOX_NETWORK: classic-stack-agent-sandbox
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - agent-proxy
+  agent-proxy:
+    build:
+      context: docker/agent
+      target: proxy
+    networks:
+      agent-sandbox:
+        aliases: [agent-proxy]
+      agent-egress: {}
+  agent-image:
+    build:
+      context: docker/agent
+      target: sandbox
+    image: classic-stack-agent-sandbox
+    profiles: [build-only]
+    network_mode: none
+networks:
+  agent-sandbox:
+    name: classic-stack-agent-sandbox
+    internal: true
+  agent-egress: {}
