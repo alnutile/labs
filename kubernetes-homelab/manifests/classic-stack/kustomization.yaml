@@ -13,10 +13,10 @@ resources:
 images:
   - name: classic-stack-app
     newName: ghcr.io/alnutile/classic-stack-app
-    newTag: kubes-20260923011359-a7d0af7 # {"$imagepolicy": "flux-system:classic-stack-release:tag"}
+    newTag: kubes-20260923012706-9c68a1b # {"$imagepolicy": "flux-system:classic-stack-release:tag"}
   - name: classic-stack-agent-broker
     newName: ghcr.io/alnutile/classic-stack-agent-broker
-    newTag: kubes-20260923011359-a7d0af7 # {"$imagepolicy": "flux-system:classic-stack-release:tag"}
+    newTag: kubes-20260923012706-9c68a1b # {"$imagepolicy": "flux-system:classic-stack-release:tag"}
   - name: classic-stack-agent-proxy
     newName: ghcr.io/alnutile/classic-stack-agent-proxy
-    newTag: kubes-20260923011359-a7d0af7 # {"$imagepolicy": "flux-system:classic-stack-release:tag"}
+    newTag: kubes-20260923012706-9c68a1b # {"$imagepolicy": "flux-system:classic-stack-release:tag"}
