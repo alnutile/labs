@@ -5,6 +5,7 @@ KUBECTL="${KUBECTL:-kubectl}"
 NAMESPACE=database
 CLUSTER=lab-postgres
 export K3S_CONFIG_FILE="${K3S_CONFIG_FILE:-/dev/null}"
+export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 
 "$KUBECTL" wait --for=condition=Ready "cluster/$CLUSTER" -n "$NAMESPACE" --timeout=5m
 primary="$("$KUBECTL" get "cluster/$CLUSTER" -n "$NAMESPACE" -o jsonpath='{.status.currentPrimary}')"

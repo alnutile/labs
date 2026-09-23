@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAB_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 KUBECTL="${KUBECTL:-kubectl}"
 export K3S_CONFIG_FILE="${K3S_CONFIG_FILE:-/dev/null}"
+export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 
 command -v "$KUBECTL" >/dev/null 2>&1 || { echo "$KUBECTL is required." >&2; exit 1; }
 "$KUBECTL" cluster-info >/dev/null
