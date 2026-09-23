@@ -115,6 +115,8 @@ class Handler(BaseHTTPRequestHandler):
             if length < 0 or length > 30 * 1024 * 1024:
                 return self.respond(413, {"error": "Request too large"})
             data = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(data, dict):
+                return self.respond(422, {"error": "Request body must be a JSON object"})
             if self.path == "/sessions":
                 return self.respond(201, start(data))
             match = re.fullmatch(r"/sessions/([a-f0-9]{32})/(command|artifacts|stop)", self.path)

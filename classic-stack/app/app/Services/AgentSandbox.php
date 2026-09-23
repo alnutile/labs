@@ -11,7 +11,9 @@ class AgentSandbox
 {
     public function start(AgentRun $run): string
     {
-        $data = [];
+        // Keep the empty request as a JSON object. An empty PHP array can be
+        // encoded as [] and the broker expects an object with optional fields.
+        $data = ['file' => null];
         if ($run->input_path) {
             $data['file'] = ['name' => $run->input_name, 'content' => base64_encode(Storage::disk('local')->get($run->input_path))];
         }
@@ -49,8 +51,12 @@ class AgentSandbox
 
     protected function request(string $path, array $data = []): array
     {
+        $data = $data ?: ['_request' => true];
+
         return Http::baseUrl(config('agent.broker_url'))
             ->withToken(config('agent.broker_token'))
-            ->connectTimeout(5)->timeout(100)->post($path, $data)->throw()->json();
+            ->connectTimeout(5)->timeout(100)
+            ->withBody(json_encode($data, JSON_THROW_ON_ERROR), 'application/json')
+            ->post($path)->throw()->json();
     }
 }
