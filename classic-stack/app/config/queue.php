@@ -31,6 +31,15 @@ return [
 
     'connections' => [
 
+        'agent' => [
+            'driver' => 'redis',
+            'connection' => 'default',
+            'queue' => 'agents',
+            'retry_after' => 960,
+            'block_for' => null,
+            'after_commit' => true,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],
