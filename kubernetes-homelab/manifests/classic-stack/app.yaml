@@ -3,9 +3,10 @@ kind: Job
 metadata:
   name: classic-stack-migrate
   namespace: classic-stack
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: enabled
 spec:
   backoffLimit: 2
-  ttlSecondsAfterFinished: 600
   template:
     metadata:
       labels:

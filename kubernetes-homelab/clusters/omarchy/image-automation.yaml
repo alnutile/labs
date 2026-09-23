@@ -1,0 +1,48 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: classic-stack-release
+  namespace: flux-system
+spec:
+  image: ghcr.io/alnutile/classic-stack-app
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: classic-stack-release
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: classic-stack-release
+  filterTags:
+    pattern: ^kubes-(?P<timestamp>[0-9]{14})-[a-f0-9]{7}$
+    extract: $timestamp
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: classic-stack
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref:
+        branch: kubes
+    commit:
+      author:
+        name: Flux
+        email: flux@users.noreply.github.com
+      messageTemplate: Deploy latest Classic Stack images
+    push:
+      branch: kubes
+  update:
+    path: ./kubernetes-homelab/manifests/classic-stack
+    strategy: Setters

@@ -21,7 +21,7 @@ The host bootstrap pins K3s to `v1.36.4+k3s1`, enables Kubernetes secret encrypt
 Run these commands in a terminal on the Omarchy machine:
 
 ```bash
-git clone --branch experiment/kubernetes-homelab https://github.com/alnutile/labs.git ~/labs
+git clone --branch kubes https://github.com/alnutile/labs.git ~/labs
 cd ~/labs/kubernetes-homelab
 sudo ./scripts/bootstrap-k3s.sh
 ./scripts/install-platform.sh
@@ -40,6 +40,30 @@ kubectl get nodes -o wide
 ```
 
 Treat that kubeconfig as a secret. It contains cluster-admin client credentials and is excluded from Git.
+
+## GitOps delivery
+
+Flux watches the `kubes` branch and reconciles the Omarchy cluster. Bootstrap it once from the Mac workstation after K3s and CloudNativePG are installed:
+
+```bash
+export KUBECONFIG="$HOME/.kube/omarchy"
+./scripts/bootstrap-flux.sh
+```
+
+Application delivery then follows this path:
+
+1. Push application or agent changes to `kubes`.
+2. GitHub Actions publishes all four images with one immutable `kubes-<timestamp>-<commit>` tag.
+3. Flux image automation records that tag in the Kubernetes manifests on `kubes`.
+4. Flux applies the Git commit to Omarchy and waits for the migration and deployments to become healthy.
+
+Changes made only to Kubernetes manifests skip the image build and are reconciled directly. Check the current state with:
+
+```bash
+flux get all
+flux get images all
+kubectl get pods -n classic-stack
+```
 
 ## PostgreSQL access
 
@@ -77,7 +101,6 @@ The script deletes the current primary Pod, waits for CloudNativePG to promote a
 
 1. Add object-storage backups and perform a documented restore. Backups on the same disk do not count as disaster recovery.
 2. Install Prometheus, Grafana, and alerting, then build PostgreSQL and node dashboards.
-3. Introduce Flux CD so the cluster reconciles this repository automatically.
-4. Add ingress, certificates, internal DNS, and a deliberate load-balancer design.
-5. Add NetworkPolicies and a restricted workload namespace.
-6. Add two more physical nodes, then move database replicas into separate failure domains.
+3. Add ingress, certificates, internal DNS, and a deliberate load-balancer design.
+4. Add NetworkPolicies and a restricted workload namespace.
+5. Add two more physical nodes, then move database replicas into separate failure domains.

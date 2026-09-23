@@ -1,10 +1,10 @@
 name: Classic stack Kubernetes images
 on:
   push:
-    branches: [experiment/classic-stack-kubernetes-agent]
+    branches: [kubes]
     paths:
-      - classic-stack/**
-      - kubernetes-homelab/manifests/classic-stack/**
+      - classic-stack/app/**
+      - classic-stack/docker/**
       - .github/workflows/classic-stack-kubernetes-images.yml
 permissions:
   contents: read
@@ -17,18 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set release tag
+        run: echo "RELEASE_TAG=kubes-$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
       - name: Log in to GitHub Container Registry
         run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and publish application
-        run: >-
-          docker buildx build --platform linux/amd64 --push
-          --target production
-          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
-          -f classic-stack/docker/Dockerfile
-          -t "$REGISTRY/$OWNER/classic-stack-app:kubernetes-lab"
-          classic-stack
       - name: Build and publish agent images
         run: |
           set -euo pipefail
@@ -41,6 +35,16 @@ jobs:
             docker buildx build --platform linux/amd64 --push \
               --target "$target" \
               --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+              -t "$REGISTRY/$OWNER/$package:$RELEASE_TAG" \
               -t "$REGISTRY/$OWNER/$package:kubernetes-lab" \
               classic-stack/docker/agent
           done
+      - name: Build and publish application release signal
+        run: >-
+          docker buildx build --platform linux/amd64 --push
+          --target production
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+          -f classic-stack/docker/Dockerfile
+          -t "$REGISTRY/$OWNER/classic-stack-app:$RELEASE_TAG"
+          -t "$REGISTRY/$OWNER/classic-stack-app:kubernetes-lab"
+          classic-stack
