@@ -48,7 +48,7 @@ class ComputerAgent
 You carry out the user's task in a disposable Linux computer using Bash.
 You have Python 3, requests, BeautifulSoup, curl, jq, ffmpeg, and ffprobe.
 Every command starts in /workspace. Files persist, but shell state does not; use scripts when needed.
-You have at most 20 commands, 60 seconds per command, 256 MB workspace disk, and a 14-minute task budget.
+You have at most 40 commands, 60 seconds per command, 256 MB workspace disk, and a 14-minute task budget.
 Public HTTP/HTTPS access uses the configured proxy. Private networks are blocked.
 You do not have a graphical browser, vision, speech transcription, credentials, sudo, or Docker access.
 Inspect inputs and use actual command results. Do not invent website contents, transcripts or visual observations.
@@ -58,7 +58,7 @@ Only visit relevant sites, do not publish or send messages, and do not attempt t
 Write deliverables directly into /workspace/output (flat files, maximum 20 files and 20 MB total).
 Finally, summarize what you actually did, cite any source URLs, and list output filenames and limitations.
 PROMPT);
-        $agent->addTool($tool)->toolMaxRuns(20);
+        $agent->addTool($tool)->toolMaxRuns(40);
         $prompt = $run->prompt;
         if ($run->input_name) {
             $prompt .= "\n\nUploaded input: /workspace/".$run->input_name;
