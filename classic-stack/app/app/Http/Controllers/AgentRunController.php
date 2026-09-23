@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\RunComputerAgent;
 use App\Models\AgentRun;
 use App\Models\User;
+use App\Services\AgentSandbox;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +69,27 @@ class AgentRunController extends Controller
         abort_unless($run->user_id === $request->user()->id, 403);
 
         return view('agent.show', ['run' => $run]);
+    }
+
+    public function cancel(Request $request, AgentRun $run, AgentSandbox $sandbox): RedirectResponse
+    {
+        abort_unless($run->user_id === $request->user()->id, 403);
+        if (! in_array($run->status, ['queued', 'running'], true)) {
+            return to_route('agent.show', $run);
+        }
+
+        $session = $run->session_id;
+        $run->update(['status' => 'canceled', 'finished_at' => now()]);
+        $run->recordEvent('status', 'Canceled by user.');
+        if ($session) {
+            try {
+                $sandbox->stop($session);
+            } catch (\Throwable) {
+                $run->recordEvent('status', 'Sandbox cleanup deferred to its expiry timer.');
+            }
+        }
+
+        return to_route('agent.show', $run);
     }
 
     public function download(Request $request, AgentRun $run, int $artifact): StreamedResponse

@@ -18,6 +18,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/agent', [AgentRunController::class, 'index'])->name('agent.index');
         Route::post('/agent', [AgentRunController::class, 'store'])->middleware('throttle:5,1')->name('agent.store');
         Route::get('/agent/{run}', [AgentRunController::class, 'show'])->name('agent.show');
+        Route::post('/agent/{run}/cancel', [AgentRunController::class, 'cancel'])->name('agent.cancel');
         Route::get('/agent/{run}/files/{artifact}', [AgentRunController::class, 'download'])->whereNumber('artifact')->name('agent.download');
     });
     Route::get('/dashboard', [DemoRunController::class, 'index'])->name('dashboard');

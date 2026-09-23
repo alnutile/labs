@@ -17,6 +17,8 @@ if len(token) < 32:
 namespace = os.environ.get("AGENT_SANDBOX_NAMESPACE", "classic-stack")
 sandbox_image = os.environ["AGENT_SANDBOX_IMAGE"]
 label = "classic-stack-agent-sandbox"
+task_timeout = max(60, min(3600, int(os.environ.get("AGENT_TASK_TIMEOUT_SECONDS", "300"))))
+session_lifetime = task_timeout + 30
 sessions = {}
 lock = threading.RLock()
 
@@ -62,7 +64,7 @@ def pod_manifest(name):
             },
         },
         "spec": {
-            "activeDeadlineSeconds": 900,
+            "activeDeadlineSeconds": session_lifetime,
             "automountServiceAccountToken": False,
             "enableServiceLinks": False,
             "restartPolicy": "Never",
@@ -78,7 +80,7 @@ def pod_manifest(name):
                 "name": "sandbox",
                 "image": sandbox_image,
                 "imagePullPolicy": "Always",
-                "command": ["sleep", "900"],
+                "command": ["sleep", str(session_lifetime)],
                 "env": [
                     {"name": key, "value": proxy}
                     for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]
@@ -114,7 +116,7 @@ def start(data):
             raise ValueError("A sandbox is already active; try again after it finishes")
         session = uuid.uuid4().hex
         pod = "classic-agent-" + session
-        sessions[session] = {"pod": pod, "expires": time.time() + 900, "calls": 0}
+        sessions[session] = {"pod": pod, "expires": time.time() + session_lifetime, "calls": 0}
     try:
         manifest = json.dumps(pod_manifest(pod)).encode()
         kubectl("apply", "-f", "-", input_bytes=manifest)
@@ -158,6 +160,8 @@ class Handler(BaseHTTPRequestHandler):
             if length < 0 or length > 30 * 1024 * 1024:
                 return self.respond(413, {"error": "Request too large"})
             data = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(data, dict):
+                return self.respond(422, {"error": "Request body must be a JSON object"})
             if self.path == "/sessions":
                 return self.respond(201, start(data))
             match = re.fullmatch(r"/sessions/([a-f0-9]{32})/(command|artifacts|stop)", self.path)
@@ -172,16 +176,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not item or item["expires"] < time.time():
                     return self.respond(410, {"error": "Sandbox expired"})
                 if action == "command":
-                    if item["calls"] >= 20:
-                        raise ValueError("Maximum of 20 commands reached")
+                    if item["calls"] >= 400:
+                        raise ValueError("Maximum of 400 commands reached")
                     command = data.get("command", "")
+                    command_timeout = data.get("timeout", 60)
                     if not isinstance(command, str) or not 1 <= len(command) <= 16000:
                         raise ValueError("Invalid command")
+                    if not isinstance(command_timeout, int) or not 1 <= command_timeout <= 60:
+                        raise ValueError("Invalid command timeout")
                     item["calls"] += 1
                 pod = item["pod"]
-            args = (["python3", "-I", "/opt/agent/execute.py", command]
+            args = (["python3", "-I", "/opt/agent/execute.py", command, str(command_timeout)]
                     if action == "command" else ["python3", "-I", "/opt/agent/collect.py"])
-            result = kubectl("exec", pod, "--", *args, timeout=75)
+            result = kubectl("exec", pod, "--", *args, timeout=(command_timeout + 15 if action == "command" else 75))
             self.respond(200, json.loads(result.stdout))
         except (ValueError, KeyError, TypeError, json.JSONDecodeError):
             self.respond(422, {"error": "Invalid request, busy sandbox, or execution limit reached"})

@@ -21,9 +21,9 @@ class AgentSandbox
         return $this->request('/sessions', $data)['session'];
     }
 
-    public function command(string $session, string $command): array
+    public function command(string $session, string $command, int $timeout = 60): array
     {
-        return $this->request('/sessions/'.$session.'/command', ['command' => $command]);
+        return $this->request('/sessions/'.$session.'/command', ['command' => $command, 'timeout' => $timeout]);
     }
 
     public function collect(AgentRun $run, string $session): array

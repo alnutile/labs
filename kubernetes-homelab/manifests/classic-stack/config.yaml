@@ -26,3 +26,4 @@ data:
   AGENT_PROVIDER: openai
   AGENT_MODEL: gpt-5.2
   AGENT_BROKER_URL: http://agent-broker:8010
+  AGENT_TASK_TIMEOUT_SECONDS: "300"

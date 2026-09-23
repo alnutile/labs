@@ -8,6 +8,7 @@ services:
       AGENT_BROKER_TOKEN: ${AGENT_BROKER_TOKEN:?Set AGENT_BROKER_TOKEN in app/.env}
       AGENT_SANDBOX_IMAGE: classic-stack-agent-sandbox
       AGENT_SANDBOX_NETWORK: classic-stack-agent-sandbox
+      AGENT_TASK_TIMEOUT_SECONDS: ${AGENT_TASK_TIMEOUT_SECONDS:-300}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:

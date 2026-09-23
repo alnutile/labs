@@ -9,4 +9,5 @@ return [
     'ollama_url' => env('AGENT_OLLAMA_URL', 'http://host.docker.internal:11434'),
     'broker_url' => env('AGENT_BROKER_URL', 'http://agent-broker:8010'),
     'broker_token' => env('AGENT_BROKER_TOKEN', ''),
+    'task_timeout_seconds' => (int) env('AGENT_TASK_TIMEOUT_SECONDS', 300),
 ];

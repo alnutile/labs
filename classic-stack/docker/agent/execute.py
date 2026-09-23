@@ -13,7 +13,8 @@ with tempfile.TemporaryFile() as output:
     )
     timed_out = False
     try:
-        process.wait(timeout=60)
+        timeout = max(1, min(60, int(sys.argv[2]) if len(sys.argv) > 2 else 60))
+        process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         timed_out = True
     finally:
