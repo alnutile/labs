@@ -23,3 +23,6 @@ These labs compare three deployment levels for the same application:
 DigitalOcean and AWS are both valid targets for the first two server-focused episodes. The current Terraform implementation starts with AWS EC2; the deployment layout and GitHub Actions release process are deliberately portable.
 
 All stacks are learning exercises. Review Terraform plans before applying them, and keep credentials in local profiles, CI secret stores, or cloud identity systems rather than Git.
+
+
+force build
