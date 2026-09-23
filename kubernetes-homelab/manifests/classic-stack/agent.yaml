@@ -81,7 +81,7 @@ spec:
                   name: classic-stack-secrets
                   key: AGENT_BROKER_TOKEN
             - name: AGENT_SANDBOX_IMAGE
-              value: ghcr.io/alnutile/classic-stack-agent-sandbox:kubernetes-lab # {"$imagepolicy": "flux-system:classic-stack-release"}
+              value: ghcr.io/alnutile/classic-stack-app:kubes-20260923003547-6eec624 # {"$imagepolicy": "flux-system:classic-stack-release"}
             - name: AGENT_SANDBOX_NAMESPACE
               valueFrom:
                 fieldRef:
