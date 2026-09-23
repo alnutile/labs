@@ -6,11 +6,11 @@ NAMESPACE=classic-stack
 export K3S_CONFIG_FILE="${K3S_CONFIG_FILE:-/dev/null}"
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 
-"$KUBECTL" exec -n "$NAMESPACE" deployment/classic-stack -- curl -fsS http://127.0.0.1/ready >/dev/null
-"$KUBECTL" auth can-i create pods -n "$NAMESPACE" --as=system:serviceaccount:classic-stack:classic-stack-agent-broker | grep -qx yes
-"$KUBECTL" auth can-i list secrets -n "$NAMESPACE" --as=system:serviceaccount:classic-stack:classic-stack-agent-sandbox | grep -qx no
+"$KUBECTL" exec -n "$NAMESPACE" deployment/classic-stack -c web -- curl -fsS http://127.0.0.1/ready >/dev/null
+[[ "$("$KUBECTL" auth can-i create pods -n "$NAMESPACE" --as=system:serviceaccount:classic-stack:classic-stack-agent-broker)" == yes ]]
+[[ "$("$KUBECTL" auth can-i list secrets -n "$NAMESPACE" --as=system:serviceaccount:classic-stack:classic-stack-agent-sandbox || true)" == no ]]
 
-"$KUBECTL" exec -i -n "$NAMESPACE" deployment/classic-stack -- php <<'PHP'
+"$KUBECTL" exec -i -n "$NAMESPACE" deployment/classic-stack -c web -- php <<'PHP'
 <?php
 
 $token = getenv('AGENT_BROKER_TOKEN');

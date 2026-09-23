@@ -44,11 +44,3 @@ jobs:
               -t "$REGISTRY/$OWNER/$package:kubernetes-lab" \
               classic-stack/docker/agent
           done
-      - name: Make lab images public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          for package in classic-stack-app classic-stack-agent-sandbox classic-stack-agent-broker classic-stack-agent-proxy; do
-            gh api --method PATCH "/user/packages/container/$package" -f visibility=public
-          done

@@ -89,7 +89,7 @@ spec:
         - name: storage-permissions
           image: classic-stack-app
           imagePullPolicy: Always
-          command: [sh, -c, "chown -R 33:33 /storage && chmod -R ug+rwX /storage"]
+          command: [chown, -R, "33:33", /storage]
           resources:
             requests:
               cpu: 10m
@@ -219,7 +219,7 @@ spec:
         - name: storage-permissions
           image: classic-stack-app
           imagePullPolicy: Always
-          command: [sh, -c, "chown -R 33:33 /storage && chmod -R ug+rwX /storage"]
+          command: [chown, -R, "33:33", /storage]
           resources:
             requests:
               cpu: 10m
