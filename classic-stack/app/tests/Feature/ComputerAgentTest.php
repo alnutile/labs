@@ -74,6 +74,8 @@ class ComputerAgentTest extends TestCase
         $this->actingAs($user)->get('/agent/'.$run->id)->assertOk()->assertSee('&lt;script&gt;', false)->assertDontSee('<script>', false);
         $this->get('/agent/'.$run->id.'/files/0')->assertDownload('report.json');
         $this->get('/agent/'.$run->id.'/files/1')->assertNotFound();
+        $run->update(['status' => 'failed']);
+        $this->get('/agent/'.$run->id.'/files/0')->assertDownload('report.json');
         $this->actingAs(User::factory()->create())->get('/agent/'.$run->id)->assertForbidden();
         $this->get('/agent/'.$run->id.'/files/0')->assertForbidden();
         $this->get('/agent')->assertDontSee($run->prompt);

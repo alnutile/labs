@@ -96,7 +96,7 @@ class AgentRunController extends Controller
     {
         abort_unless($run->user_id === $request->user()->id, 403);
         $file = $run->artifacts[$artifact] ?? null;
-        abort_unless($run->status === 'completed' && $file, 404);
+        abort_unless($file && Storage::disk('local')->exists($file['path']), 404);
 
         return Storage::disk('local')->download($file['path'], $file['name'], [
             'Content-Type' => 'application/octet-stream', 'X-Content-Type-Options' => 'nosniff',
