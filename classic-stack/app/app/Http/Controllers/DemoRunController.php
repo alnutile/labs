@@ -17,7 +17,7 @@ class DemoRunController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate(['message' => ['required', 'string', 'max:200']]);
+        $data = $request->validate(['message' => ['required', 'string', 'max:12000']]);
         DB::transaction(function () use ($request, $data) {
             $run = DemoRun::create($data + ['user_id' => $request->user()->id]);
             WriteDemoReport::dispatch($run->id)->afterCommit()->delay(now()->addSeconds(5));
