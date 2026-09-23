@@ -5,6 +5,7 @@
 **/node_modules
 **/database/*.sqlite*
 **/storage/logs/*
+**/storage/app/**
 **/storage/framework/cache/data/*
 **/storage/framework/sessions/*
 **/storage/framework/views/*

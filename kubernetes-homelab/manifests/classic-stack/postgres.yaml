@@ -1,0 +1,32 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: classic-postgres
+  namespace: classic-stack
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:42708a75345b7a48fdd9257b071830783a97fd228529196b6313187a7198e185
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: classic_stack
+      owner: classic_stack
+      dataChecksums: true
+  affinity:
+    podAntiAffinityType: preferred
+    topologyKey: kubernetes.io/hostname
+  resources:
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  storage:
+    storageClass: local-path
+    size: 5Gi
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: preferred

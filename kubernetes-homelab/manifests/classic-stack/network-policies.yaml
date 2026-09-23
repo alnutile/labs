@@ -1,0 +1,127 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-sandbox-isolation
+  namespace: classic-stack
+spec:
+  podSelector:
+    matchLabels:
+      classic-stack-agent-sandbox: "true"
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-proxy
+      ports:
+        - protocol: TCP
+          port: 3128
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-proxy
+  namespace: classic-stack
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agent-proxy
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              classic-stack-agent-sandbox: "true"
+      ports:
+        - protocol: TCP
+          port: 3128
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 0.0.0.0/8
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 198.18.0.0/15
+              - 224.0.0.0/4
+              - 240.0.0.0/4
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-broker
+  namespace: classic-stack
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agent-broker
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [web, worker]
+      ports:
+        - protocol: TCP
+          port: 8010
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 192.168.0.180/32
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

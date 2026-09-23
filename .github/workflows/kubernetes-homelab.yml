@@ -1,0 +1,42 @@
+name: Kubernetes homelab — validate
+on:
+  pull_request:
+    paths:
+      - kubernetes-homelab/**
+      - .github/workflows/kubernetes-homelab.yml
+  push:
+    branches: [main]
+    paths:
+      - kubernetes-homelab/**
+      - .github/workflows/kubernetes-homelab.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check shell scripts
+        run: >-
+          docker run --rm
+          -v "$PWD/kubernetes-homelab/scripts:/mnt:ro"
+          koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+          /mnt/bootstrap-k3s.sh
+          /mnt/install-platform.sh
+          /mnt/verify-postgres.sh
+          /mnt/failover-postgres.sh
+          /mnt/fetch-kubeconfig.sh
+          /mnt/deploy-classic-stack.sh
+          /mnt/verify-classic-stack.sh
+      - name: Install pinned kubectl
+        run: |
+          curl -fsSLo /tmp/kubectl https://dl.k8s.io/release/v1.36.4/bin/linux/amd64/kubectl
+          echo '8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a  /tmp/kubectl' | sha256sum --check
+          chmod +x /tmp/kubectl
+      - name: Render Kubernetes manifests
+        run: |
+          /tmp/kubectl kustomize kubernetes-homelab/manifests/database > /tmp/kubernetes-homelab.yaml
+          /tmp/kubectl kustomize kubernetes-homelab/manifests/classic-stack > /tmp/classic-stack.yaml
+      - name: Check whitespace
+        run: git diff --check

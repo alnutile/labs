@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-proxy
+  namespace: classic-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-proxy
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: proxy
+          image: classic-stack-agent-proxy
+          imagePullPolicy: Always
+          ports:
+            - name: proxy
+              containerPort: 3128
+          readinessProbe:
+            tcpSocket:
+              port: proxy
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-proxy
+  namespace: classic-stack
+spec:
+  selector:
+    app.kubernetes.io/name: agent-proxy
+  ports:
+    - name: proxy
+      port: 3128
+      targetPort: proxy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-broker
+  namespace: classic-stack
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-broker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-broker
+    spec:
+      serviceAccountName: classic-stack-agent-broker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: broker
+          image: classic-stack-agent-broker
+          imagePullPolicy: Always
+          env:
+            - name: AGENT_BROKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: classic-stack-secrets
+                  key: AGENT_BROKER_TOKEN
+            - name: AGENT_SANDBOX_IMAGE
+              value: ghcr.io/alnutile/classic-stack-agent-sandbox:kubernetes-lab # {"$imagepolicy": "flux-system:classic-stack-agent-sandbox"}
+            - name: AGENT_SANDBOX_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: AGENT_TASK_TIMEOUT_SECONDS
+              value: "300"
+          ports:
+            - name: http
+              containerPort: 8010
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-broker
+  namespace: classic-stack
+spec:
+  selector:
+    app.kubernetes.io/name: agent-broker
+  ports:
+    - name: http
+      port: 8010
+      targetPort: http
