@@ -20,6 +20,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::define('use-computer-agent', fn ($user) => config('agent.enabled') && app()->environment(['local', 'testing']));
+        Gate::define('use-computer-agent', fn ($user) => config('agent.enabled') && app()->environment(config('agent.allowed_environments')));
     }
 }

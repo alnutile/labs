@@ -27,12 +27,16 @@ jobs:
           /mnt/verify-postgres.sh
           /mnt/failover-postgres.sh
           /mnt/fetch-kubeconfig.sh
+          /mnt/deploy-classic-stack.sh
+          /mnt/verify-classic-stack.sh
       - name: Install pinned kubectl
         run: |
           curl -fsSLo /tmp/kubectl https://dl.k8s.io/release/v1.36.4/bin/linux/amd64/kubectl
           echo '8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a  /tmp/kubectl' | sha256sum --check
           chmod +x /tmp/kubectl
       - name: Render Kubernetes manifests
-        run: /tmp/kubectl kustomize kubernetes-homelab/manifests/database > /tmp/kubernetes-homelab.yaml
+        run: |
+          /tmp/kubectl kustomize kubernetes-homelab/manifests/database > /tmp/kubernetes-homelab.yaml
+          /tmp/kubectl kustomize kubernetes-homelab/manifests/classic-stack > /tmp/classic-stack.yaml
       - name: Check whitespace
         run: git diff --check

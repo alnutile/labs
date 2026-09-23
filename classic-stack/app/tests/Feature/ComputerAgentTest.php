@@ -39,6 +39,8 @@ class ComputerAgentTest extends TestCase
         config(['agent.enabled' => true]);
         $this->app->detectEnvironment(fn () => 'production');
         $this->get('/agent')->assertForbidden();
+        config(['agent.allowed_environments' => ['production']]);
+        $this->get('/agent')->assertOk();
     }
 
     public function test_task_queues_private_input_and_limits_active_runs(): void

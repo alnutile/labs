@@ -1,0 +1,54 @@
+name: Classic stack Kubernetes images
+on:
+  push:
+    branches: [experiment/classic-stack-kubernetes-agent]
+    paths:
+      - classic-stack/**
+      - kubernetes-homelab/manifests/classic-stack/**
+      - .github/workflows/classic-stack-kubernetes-images.yml
+permissions:
+  contents: read
+  packages: write
+env:
+  REGISTRY: ghcr.io
+  OWNER: alnutile
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Log in to GitHub Container Registry
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish application
+        run: >-
+          docker buildx build --platform linux/amd64 --push
+          --target production
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+          -f classic-stack/docker/Dockerfile
+          -t "$REGISTRY/$OWNER/classic-stack-app:kubernetes-lab"
+          classic-stack
+      - name: Build and publish agent images
+        run: |
+          set -euo pipefail
+          for target in sandbox kubernetes-broker proxy; do
+            case "$target" in
+              sandbox) package=classic-stack-agent-sandbox ;;
+              kubernetes-broker) package=classic-stack-agent-broker ;;
+              proxy) package=classic-stack-agent-proxy ;;
+            esac
+            docker buildx build --platform linux/amd64 --push \
+              --target "$target" \
+              --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+              -t "$REGISTRY/$OWNER/$package:kubernetes-lab" \
+              classic-stack/docker/agent
+          done
+      - name: Make lab images public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for package in classic-stack-app classic-stack-agent-sandbox classic-stack-agent-broker classic-stack-agent-proxy; do
+            gh api --method PATCH "/user/packages/container/$package" -f visibility=public
+          done

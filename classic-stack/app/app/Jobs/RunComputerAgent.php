@@ -29,8 +29,8 @@ class RunComputerAgent implements ShouldQueue
      */
     public function handle(ComputerAgent $agent, AgentSandbox $sandbox): void
     {
-        if (! config('agent.enabled') || ! app()->environment(['local', 'testing'])) {
-            throw new \RuntimeException('The computer agent is a local-only experiment.');
+        if (! config('agent.enabled') || ! app()->environment(config('agent.allowed_environments'))) {
+            throw new \RuntimeException('The computer agent is not enabled in this environment.');
         }
         if (! AgentRun::whereKey($this->runId)->where('status', 'queued')->update(['status' => 'running'])) {
             return;

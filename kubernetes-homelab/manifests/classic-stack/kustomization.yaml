@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - config.yaml
+  - storage.yaml
+  - postgres.yaml
+  - redis.yaml
+  - agent-rbac.yaml
+  - agent.yaml
+  - app.yaml
+  - network-policies.yaml
+images:
+  - name: classic-stack-app
+    newName: ghcr.io/alnutile/classic-stack-app
+    newTag: kubernetes-lab
+  - name: classic-stack-agent-broker
+    newName: ghcr.io/alnutile/classic-stack-agent-broker
+    newTag: kubernetes-lab
+  - name: classic-stack-agent-proxy
+    newName: ghcr.io/alnutile/classic-stack-agent-proxy
+    newTag: kubernetes-lab

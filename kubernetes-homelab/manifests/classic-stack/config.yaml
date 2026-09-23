@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: classic-stack-env
+  namespace: classic-stack
+data:
+  APP_NAME: Classic Stack Kubernetes Lab
+  APP_ENV: kubernetes
+  APP_DEBUG: "false"
+  APP_URL: http://127.0.0.1:8089
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: info
+  DB_CONNECTION: pgsql
+  DB_DATABASE: classic_stack
+  SESSION_DRIVER: redis
+  SESSION_SECURE_COOKIE: "false"
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: redis
+  REDIS_CLIENT: predis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  MAIL_MAILER: log
+  ALLOW_REGISTRATION: "true"
+  AGENT_ENABLED: "true"
+  AGENT_ALLOWED_ENVIRONMENTS: kubernetes
+  AGENT_PROVIDER: openai
+  AGENT_MODEL: gpt-5.2
+  AGENT_BROKER_URL: http://agent-broker:8010

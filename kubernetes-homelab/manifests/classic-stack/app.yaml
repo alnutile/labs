@@ -1,0 +1,357 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: classic-stack-migrate
+  namespace: classic-stack
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classic-stack
+        app.kubernetes.io/component: migration
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: classic-stack-app
+          imagePullPolicy: Always
+          args: [php, artisan, migrate, --force]
+          envFrom:
+            - configMapRef:
+                name: classic-stack-env
+            - secretRef:
+                name: classic-stack-secrets
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: port
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 33
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classic-stack
+  namespace: classic-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classic-stack
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classic-stack
+        app.kubernetes.io/component: web
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 33
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: storage-permissions
+          image: classic-stack-app
+          imagePullPolicy: Always
+          command: [sh, -c, "chown -R 33:33 /storage && chmod -R ug+rwX /storage"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN]
+          volumeMounts:
+            - name: app-storage
+              mountPath: /storage
+      containers:
+        - name: web
+          image: classic-stack-app
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: classic-stack-env
+            - secretRef:
+                name: classic-stack-secrets
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: port
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: password
+          ports:
+            - name: http
+              containerPort: 80
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN, DAC_OVERRIDE, NET_BIND_SERVICE, SETGID, SETUID]
+          volumeMounts:
+            - name: app-storage
+              mountPath: /var/www/html/storage/app/private
+      volumes:
+        - name: app-storage
+          persistentVolumeClaim:
+            claimName: classic-stack-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: classic-stack
+  namespace: classic-stack
+spec:
+  selector:
+    app.kubernetes.io/name: classic-stack
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classic-stack-horizon
+  namespace: classic-stack
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classic-stack
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classic-stack
+        app.kubernetes.io/component: worker
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        fsGroup: 33
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: storage-permissions
+          image: classic-stack-app
+          imagePullPolicy: Always
+          command: [sh, -c, "chown -R 33:33 /storage && chmod -R ug+rwX /storage"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN]
+          volumeMounts:
+            - name: app-storage
+              mountPath: /storage
+      containers:
+        - name: horizon
+          image: classic-stack-app
+          imagePullPolicy: Always
+          args: [php, artisan, horizon]
+          envFrom:
+            - configMapRef:
+                name: classic-stack-env
+            - secretRef:
+                name: classic-stack-secrets
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: port
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 33
+          volumeMounts:
+            - name: app-storage
+              mountPath: /var/www/html/storage/app/private
+      volumes:
+        - name: app-storage
+          persistentVolumeClaim:
+            claimName: classic-stack-storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classic-stack-scheduler
+  namespace: classic-stack
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classic-stack
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classic-stack
+        app.kubernetes.io/component: scheduler
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: scheduler
+          image: classic-stack-app
+          imagePullPolicy: Always
+          args: [php, artisan, schedule:work]
+          envFrom:
+            - configMapRef:
+                name: classic-stack-env
+            - secretRef:
+                name: classic-stack-secrets
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: port
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classic-postgres-app
+                  key: password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 33

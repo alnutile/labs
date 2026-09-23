@@ -13,6 +13,18 @@ RUN pip install --no-cache-dir docker==7.1.0
 COPY broker.py /opt/agent/broker.py
 CMD ["python", "-u", "/opt/agent/broker.py"]
 
+FROM python:3.12-slim-bookworm AS kubernetes-broker
+ARG KUBECTL_VERSION=v1.36.4
+ARG KUBECTL_SHA256=8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+    && echo "${KUBECTL_SHA256}  /usr/local/bin/kubectl" | sha256sum --check \
+    && chmod 0755 /usr/local/bin/kubectl \
+    && rm -rf /var/lib/apt/lists/*
+COPY broker_kubernetes.py /opt/agent/broker.py
+USER 65532:65532
+CMD ["python", "-u", "/opt/agent/broker.py"]
+
 FROM debian:bookworm-slim AS proxy
 RUN apt-get update && apt-get install -y --no-install-recommends squid \
     && rm -rf /var/lib/apt/lists/*
