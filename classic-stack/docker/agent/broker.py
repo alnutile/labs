@@ -16,6 +16,8 @@ token = os.environ["AGENT_BROKER_TOKEN"]
 if len(token) < 32:
     raise RuntimeError("AGENT_BROKER_TOKEN must contain at least 32 characters")
 label = "classic-stack.agent-sandbox"
+task_timeout = max(60, min(3600, int(os.environ.get("AGENT_TASK_TIMEOUT_SECONDS", "300"))))
+session_lifetime = task_timeout + 30
 sessions = {}
 lock = threading.RLock()
 
@@ -45,7 +47,7 @@ def start(data):
             raise ValueError("A sandbox is already active; try again after it finishes")
         session = uuid.uuid4().hex
         container = client.containers.run(
-            os.environ["AGENT_SANDBOX_IMAGE"], ["sleep", "900"], detach=True,
+            os.environ["AGENT_SANDBOX_IMAGE"], ["sleep", str(session_lifetime)], detach=True,
             name="classic-agent-" + session, labels={label: "true"},
             network=os.environ["AGENT_SANDBOX_NETWORK"], user="1000:1000",
             read_only=True, cap_drop=["ALL"], security_opt=["no-new-privileges:true"],
@@ -59,7 +61,7 @@ def start(data):
                          "https_proxy": "http://agent-proxy:3128"},
             log_config=docker.types.LogConfig(type="none"),
         )
-        sessions[session] = {"container": container, "expires": time.time() + 900, "calls": 0}
+        sessions[session] = {"container": container, "expires": time.time() + session_lifetime, "calls": 0}
         try:
             container.exec_run(["mkdir", "-p", "/workspace/output"])
             if data.get("file"):
@@ -131,13 +133,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not item or item["expires"] < time.time():
                     return self.respond(410, {"error": "Sandbox expired"})
                 if action == "command":
-                    if item["calls"] >= 40:
-                        raise ValueError("Maximum of 40 commands reached")
+                    if item["calls"] >= 400:
+                        raise ValueError("Maximum of 400 commands reached")
                     command = data.get("command", "")
+                    command_timeout = data.get("timeout", 60)
                     if not isinstance(command, str) or not 1 <= len(command) <= 16000:
                         raise ValueError("Invalid command")
+                    if not isinstance(command_timeout, int) or not 1 <= command_timeout <= 60:
+                        raise ValueError("Invalid command timeout")
                     item["calls"] += 1
-            args = (["python3", "-I", "/opt/agent/execute.py", command] if action == "command"
+            args = (["python3", "-I", "/opt/agent/execute.py", command, str(command_timeout)] if action == "command"
                     else ["python3", "-I", "/opt/agent/collect.py"])
             result = item["container"].exec_run(args, workdir="/workspace")
             if result.exit_code != 0:

@@ -7,7 +7,9 @@
 <h1>{{ ucfirst($run->status) }}.</h1>
 <section class="card"><h2>Your message</h2><p class="agent-text">{{ $run->prompt }}</p>
 @if($run->input_name)<p class="muted">Attached: {{ $run->input_name }}</p>@endif</section>
-@if(in_array($run->status, ['queued', 'running']))<p role="status">This page refreshes every three seconds while the agent works.</p>@endif
+@if(in_array($run->status, ['queued', 'running']))
+<div class="row"><p role="status">This page refreshes every three seconds while the agent works. The task has a five-minute limit.</p><form method="POST" action="{{ route('agent.cancel', $run) }}">@csrf<button class="danger">Cancel task</button></form></div>
+@endif
 @if($run->error)<p class="notice error">{{ $run->error }}</p>@endif
 @if($run->result)<section class="card"><h2>Agent response</h2><p class="agent-text">{{ $run->result }}</p></section>@endif
 @if($run->artifacts)

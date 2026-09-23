@@ -79,6 +79,27 @@ class ComputerAgentTest extends TestCase
         $this->get('/agent')->assertDontSee($run->prompt);
     }
 
+    public function test_owner_can_cancel_a_running_task_and_stop_its_sandbox(): void
+    {
+        Http::fake([
+            'agent-broker:8010/sessions/live-session/stop' => Http::response(['stopped' => true]),
+        ]);
+        $user = User::factory()->create();
+        $run = AgentRun::factory()->create([
+            'user_id' => $user->id,
+            'status' => 'running',
+            'session_id' => 'live-session',
+        ]);
+
+        $this->actingAs(User::factory()->create())->post(route('agent.cancel', $run))->assertForbidden();
+        $this->actingAs($user)->post(route('agent.cancel', $run))->assertRedirect(route('agent.show', $run));
+
+        $run->refresh();
+        $this->assertSame('canceled', $run->status);
+        $this->assertSame('Canceled by user.', $run->events[0]['text']);
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/live-session/stop'));
+    }
+
     public function test_neuron_loop_records_shell_output_saves_artifacts_and_cleans_up(): void
     {
         $provider = $this->shellProvider('printf hello > output/hello.txt');

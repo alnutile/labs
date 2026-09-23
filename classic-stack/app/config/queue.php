@@ -35,7 +35,7 @@ return [
             'driver' => 'redis',
             'connection' => 'default',
             'queue' => 'agents',
-            'retry_after' => 960,
+            'retry_after' => 360,
             'block_for' => null,
             'after_commit' => true,
         ],

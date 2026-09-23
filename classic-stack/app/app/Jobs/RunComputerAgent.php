@@ -15,7 +15,7 @@ class RunComputerAgent implements ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 840;
+    public int $timeout = 330;
 
     public bool $failOnTimeout = true;
 
@@ -44,8 +44,17 @@ class RunComputerAgent implements ShouldQueue
             $run->recordEvent('status', 'Workspace ready. The agent can now run commands.');
             $result = $agent->run($run, $sandbox, $session);
             $artifacts = $sandbox->collect($run, $session);
-            $run->update(['result' => $result, 'artifacts' => $artifacts, 'status' => 'completed', 'finished_at' => now()]);
+            AgentRun::whereKey($run->id)->where('status', 'running')->update([
+                'result' => $result, 'artifacts' => $artifacts, 'status' => 'completed', 'finished_at' => now(),
+            ]);
         } catch (Throwable $error) {
+            if ($session && $run->fresh()->status === 'running') {
+                try {
+                    $run->update(['artifacts' => $sandbox->collect($run, $session)]);
+                } catch (Throwable) {
+                    // The sandbox may already be unavailable; keep the command log.
+                }
+            }
             $this->failed($error);
             throw $error;
         } finally {
@@ -61,9 +70,15 @@ class RunComputerAgent implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $timedOut = $exception && (
+            str_contains($exception::class, 'Timeout')
+            || str_contains($exception->getMessage(), 'five-minute task limit')
+        );
         AgentRun::whereKey($this->runId)->whereIn('status', ['queued', 'running'])->update([
             'status' => 'failed', 'finished_at' => now(),
-            'error' => 'The task stopped. Check the worker logs and model configuration. Commands already completed are shown below.',
+            'error' => $timedOut
+                ? 'The task reached its five-minute limit. Partial commands and files are shown below.'
+                : 'The task stopped. Check the worker logs and model configuration. Commands already completed are shown below.',
         ]);
     }
 }
