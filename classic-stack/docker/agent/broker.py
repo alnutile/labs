@@ -131,8 +131,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not item or item["expires"] < time.time():
                     return self.respond(410, {"error": "Sandbox expired"})
                 if action == "command":
-                    if item["calls"] >= 20:
-                        raise ValueError("Maximum of 20 commands reached")
+                    if item["calls"] >= 40:
+                        raise ValueError("Maximum of 40 commands reached")
                     command = data.get("command", "")
                     if not isinstance(command, str) or not 1 <= len(command) <= 16000:
                         raise ValueError("Invalid command")
