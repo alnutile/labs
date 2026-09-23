@@ -1,5 +1,6 @@
 name: Classic stack Kubernetes images
 on:
+  workflow_dispatch:
   push:
     branches: [kubes]
     paths:
@@ -9,6 +10,9 @@ on:
 permissions:
   contents: read
   packages: write
+concurrency:
+  group: classic-stack-kubernetes-images-${{ github.ref }}
+  cancel-in-progress: true
 env:
   REGISTRY: ghcr.io
   OWNER: alnutile
