@@ -4,6 +4,7 @@ set -euo pipefail
 KUBECTL="${KUBECTL:-kubectl}"
 NAMESPACE=database
 CLUSTER=lab-postgres
+export K3S_CONFIG_FILE="${K3S_CONFIG_FILE:-/dev/null}"
 
 old_primary="$("$KUBECTL" get "cluster/$CLUSTER" -n "$NAMESPACE" -o jsonpath='{.status.currentPrimary}')"
 if [[ -z "$old_primary" ]]; then

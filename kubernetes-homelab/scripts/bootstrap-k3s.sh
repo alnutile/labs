@@ -67,6 +67,12 @@ sed "s#https://127.0.0.1:6443#https://${node_ip}:6443#" /etc/rancher/k3s/k3s.yam
 chown "$operator_user:$operator_group" "$operator_home/.kube/config"
 chmod 0600 "$operator_home/.kube/config"
 
+for _ in $(seq 1 150); do
+  if KUBECONFIG="$operator_home/.kube/config" k3s kubectl get "node/$NODE_NAME" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
 KUBECONFIG="$operator_home/.kube/config" k3s kubectl wait --for=condition=Ready "node/$NODE_NAME" --timeout=5m
 KUBECONFIG="$operator_home/.kube/config" k3s kubectl get nodes -o wide
 
